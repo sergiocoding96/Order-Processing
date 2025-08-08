@@ -1,0 +1,44 @@
+{
+  "numero_pedido": "7019224",
+  "cliente": "BerryMark nv/sa",
+  "fecha_pedido": "2024-04-05",
+  "productos": [
+    {
+      "nombre_producto": "IQF Blueberry 4x2,5KG CTN",
+      "cantidad": 150,
+      "unidad": "kg",
+      "precio_unitario": 3.29,
+      "total_producto": 493.5
+    },
+    {
+      "nombre_producto": "IQF Mango Chunks 4x2,5KG CTN",
+      "cantidad": 250,
+      "unidad": "kg",
+      "precio_unitario": 2.76,
+      "total_producto": 690
+    },
+    {
+      "nombre_producto": "IQF Berry Mix 5 4x2,5KG CTN",
+      "cantidad": 160,
+      "unidad": "kg",
+      "precio_unitario": 2.65,
+      "total_producto": 424
+    },
+    {
+      "nombre_producto": "IQF Berry Mix 5 4x2,5KG CTN",
+      "cantidad": 40,
+      "unidad": "kg",
+      "precio_unitario": 2.65,
+      "total_producto": 106
+    },
+    {
+      "nombre_producto": "IQF Pineapple MD2 tidbits 4x2,5KG CTN",
+      "cantidad": 100,
+      "unidad": "kg",
+      "precio_unitario": 2.44,
+      "total_producto": 244
+    }
+  ],
+  "total_pedido": 1957.5,
+  "observaciones": "All goods remain the property of Berrymark nv/sa until payment is fully received. VAT Code: B (VAT reverse charge)"
+}

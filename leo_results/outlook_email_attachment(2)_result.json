@@ -1,0 +1,30 @@
+{
+  "numero_pedido": null,
+  "cliente": "ALIMARKET ALBORADA S.L",
+  "fecha_pedido": "2024-06-10",
+  "productos": [
+    {
+      "nombre_producto": "Queso Feta D.O.P. 200 gr",
+      "cantidad": 48,
+      "unidad": null,
+      "precio_unitario": 2.45,
+      "total_producto": 58.8
+    },
+    {
+      "nombre_producto": "Queso Feta D.O.P. 400 gr",
+      "cantidad": 72,
+      "unidad": null,
+      "precio_unitario": 4.9,
+      "total_producto": 117.6
+    },
+    {
+      "nombre_producto": "Queso Feta D.O.P. 400 gr",
+      "cantidad": -24,
+      "unidad": null,
+      "precio_unitario": 4.9,
+      "total_producto": -117.6
+    }
+  ],
+  "total_pedido": -19.6,
+  "observaciones": "This document reflects a credit note or adjustment, as indicated by the negative total amounts."
+}

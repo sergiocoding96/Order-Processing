@@ -1,0 +1,216 @@
+{
+  "summary": {
+    "totalFiles": 7,
+    "successful": 4,
+    "failed": 3,
+    "totalProducts": 17,
+    "totalOrders": 4,
+    "totalValue": 10717.92,
+    "processingTimes": [
+      41.265,
+      28.567,
+      25.38,
+      53.503
+    ]
+  },
+  "results": [
+    {
+      "file": "outlook_email_attachment(1).pdf",
+      "success": true,
+      "data": {
+        "numero_pedido": "7019224",
+        "cliente": "Berrymark nv/sa",
+        "fecha_pedido": "2024-04-05",
+        "productos": [
+          {
+            "nombre_producto": "IQF Blueberry 4x2,5KG CTN",
+            "cantidad": 150,
+            "unidad": "Kilogramo",
+            "precio_unitario": 3.29,
+            "total_producto": 493.5
+          },
+          {
+            "nombre_producto": "IQF Mango Chunks 4x2,5KG CTN",
+            "cantidad": 250,
+            "unidad": "Kilogramo",
+            "precio_unitario": 2.76,
+            "total_producto": 690
+          },
+          {
+            "nombre_producto": "IQF Berry Mix 5 4x2,5KG CTN",
+            "cantidad": 160,
+            "unidad": "Kilogramo",
+            "precio_unitario": 2.65,
+            "total_producto": 424
+          },
+          {
+            "nombre_producto": "IQF Berry Mix 5 4x2,5KG CTN",
+            "cantidad": 40,
+            "unidad": "Kilogramo",
+            "precio_unitario": 2.65,
+            "total_producto": 106
+          },
+          {
+            "nombre_producto": "IQF Pineapple MD2 tidbits 4x2,5KG CTN",
+            "cantidad": 100,
+            "unidad": "Kilogramo",
+            "precio_unitario": 2.44,
+            "total_producto": 244
+          }
+        ],
+        "total_pedido": 1957.5,
+        "observaciones": "All goods remain the property of Berrymark nv/sa until payment is fully received. VAT-code B: VAT reverse charge."
+      },
+      "processingTime": 41.265,
+      "confidence": 1
+    },
+    {
+      "file": "outlook_email_attachment(2).pdf",
+      "success": false,
+      "error": "Failed to parse structured data from reasoning step. Provider: gemini, Error: Unexpected end of JSON input",
+      "processingTime": 36.457
+    },
+    {
+      "file": "outlook_email_attachment(3).pdf",
+      "success": true,
+      "data": {
+        "numero_pedido": "01/240053",
+        "cliente": "MA.CE.DER., S.L.",
+        "fecha_pedido": "2024-01-05",
+        "productos": [
+          {
+            "nombre_producto": "PORTES",
+            "cantidad": 1,
+            "unidad": "Unidad",
+            "precio_unitario": 430,
+            "total_producto": 430
+          },
+          {
+            "nombre_producto": "PP PALET EURO 80 x 120 COLOR",
+            "cantidad": 8,
+            "unidad": "Unidad",
+            "precio_unitario": 0,
+            "total_producto": 0
+          },
+          {
+            "nombre_producto": "PP PALET EURO 80 x 120 COLOR",
+            "cantidad": 4,
+            "unidad": "Unidad",
+            "precio_unitario": 0,
+            "total_producto": 0
+          },
+          {
+            "nombre_producto": "CET05R09 CEBOLLA AL NATURAL 9x9 BOLSA TS 5 Kg (LEO FOODS)",
+            "cantidad": 550,
+            "unidad": "Kilogramo",
+            "precio_unitario": 0.95,
+            "total_producto": 522.5
+          },
+          {
+            "nombre_producto": "CET05R09 CEBOLLA AL NATURAL 9x9 BOLSA TS 5 Kg (LEO FOODS)",
+            "cantidad": 1650,
+            "unidad": "Kilogramo",
+            "precio_unitario": 0.95,
+            "total_producto": 1567.5
+          },
+          {
+            "nombre_producto": "CEA20P00 PURE DE CEBOLLA 20 KG (LEO FOOD)",
+            "cantidad": 4800,
+            "unidad": "Kilogramo",
+            "precio_unitario": 0.95,
+            "total_producto": 4560
+          }
+        ],
+        "total_pedido": 7835.3,
+        "observaciones": "Incoterm: DAP; Forma de pago: ANTICIPADO; Vencimiento: 2024-01-05"
+      },
+      "processingTime": 28.567,
+      "confidence": 0.8999999999999999
+    },
+    {
+      "file": "outlook_email_attachment(4).pdf",
+      "success": false,
+      "error": "Failed to parse structured data from reasoning step. Provider: gemini, Error: Unexpected end of JSON input",
+      "processingTime": 45.456
+    },
+    {
+      "file": "outlook_email_attachment(5).pdf",
+      "success": true,
+      "data": {
+        "numero_pedido": null,
+        "cliente": "TOKYO-YA, S.A.",
+        "fecha_pedido": "2024-09-25",
+        "productos": [
+          {
+            "nombre_producto": "Kikkoman Shoyu(1L) NL",
+            "cantidad": 60,
+            "unidad": "Ud",
+            "precio_unitario": 4.4,
+            "total_producto": 264
+          },
+          {
+            "nombre_producto": "Kikkoman Gluten Free Shoyu(1L)",
+            "cantidad": 30,
+            "unidad": "Ud",
+            "precio_unitario": 5.02,
+            "total_producto": 150.6
+          },
+          {
+            "nombre_producto": "Kikkoman Shoyu(250ml) NL",
+            "cantidad": 48,
+            "unidad": "Ud",
+            "precio_unitario": 2.2,
+            "total_producto": 105.6
+          },
+          {
+            "nombre_producto": "Teriyaki Sauce(250ml) NL",
+            "cantidad": 18,
+            "unidad": "Ud",
+            "precio_unitario": 2.51,
+            "total_producto": 45.18
+          }
+        ],
+        "total_pedido": 621.92,
+        "observaciones": "No claims accepted after 48 hours post-delivery. Returns must be made within 7 days of delivery."
+      },
+      "processingTime": 25.38,
+      "confidence": 1
+    },
+    {
+      "file": "outlook_email_attachment(6).pdf",
+      "success": false,
+      "error": "Failed to parse structured data from reasoning step. Provider: gemini, Error: Unexpected end of JSON input",
+      "processingTime": 74.952
+    },
+    {
+      "file": "outlook_email_attachment.pdf",
+      "success": true,
+      "data": {
+        "numero_pedido": "24055189",
+        "cliente": "Biogran",
+        "fecha_pedido": "2024-10-18",
+        "productos": [
+          {
+            "nombre_producto": "Mayonegran Mayonesa Sin Huevo Bio, 245 g",
+            "cantidad": 60,
+            "unidad": "unidades",
+            "precio_unitario": 2.92,
+            "total_producto": 175.2
+          },
+          {
+            "nombre_producto": "Yogur de Coco Natural Bio (F), 350 g",
+            "cantidad": 60,
+            "unidad": "unidades",
+            "precio_unitario": 1.744,
+            "total_producto": 104.64
+          }
+        ],
+        "total_pedido": 303.2,
+        "observaciones": "Shipping: 20 packages (Frescos: 10, Seco: 10). Note: No returns accepted after 48 hours."
+      },
+      "processingTime": 53.503,
+      "confidence": 1
+    }
+  ],
+  "processedAt": "2025-08-08T10:01:32.625Z"
+}

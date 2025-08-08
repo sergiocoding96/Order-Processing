@@ -1,0 +1,23 @@
+{
+  "numero_pedido": "24055189",
+  "cliente": "Biogran",
+  "fecha_pedido": "2024-10-18",
+  "productos": [
+    {
+      "nombre_producto": "Mayonegran Mayonesa Sin Huevo Bio, 245 g",
+      "cantidad": 60,
+      "unidad": "unidades",
+      "precio_unitario": 2.92,
+      "total_producto": 175.2
+    },
+    {
+      "nombre_producto": "Yogur de Coco Natural Bio (F), 350 g",
+      "cantidad": 60,
+      "unidad": "unidades",
+      "precio_unitario": 1.744,
+      "total_producto": 104.64
+    }
+  ],
+  "total_pedido": 303.2,
+  "observaciones": "Shipping: 20 packages (Frescos: 10, Seco: 10). Note: No returns accepted after 48 hours."
+}

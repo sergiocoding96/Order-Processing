@@ -1,0 +1,51 @@
+{
+  "numero_pedido": "01/240053",
+  "cliente": "MA.CE.DER., S.L.",
+  "fecha_pedido": "2024-01-05",
+  "productos": [
+    {
+      "nombre_producto": "PORTES 21%",
+      "cantidad": 1,
+      "unidad": "Ud",
+      "precio_unitario": 430,
+      "total_producto": 430
+    },
+    {
+      "nombre_producto": "PP PALET EURO 80 x 120 COLOR",
+      "cantidad": 8,
+      "unidad": "Ud",
+      "precio_unitario": 0,
+      "total_producto": 0
+    },
+    {
+      "nombre_producto": "PP PALET EURO 80 x 120 COLOR",
+      "cantidad": 4,
+      "unidad": "Ud",
+      "precio_unitario": 0,
+      "total_producto": 0
+    },
+    {
+      "nombre_producto": "CET05R09 CEBOLLA AL NATURAL 9x9 BOLSA TS 5 Kg (LEO FOODS)",
+      "cantidad": 550,
+      "unidad": "Kg",
+      "precio_unitario": 0.95,
+      "total_producto": 522.5
+    },
+    {
+      "nombre_producto": "CET05R09 CEBOLLA AL NATURAL 9x9 BOLSA TS 5 Kg (LEO FOODS)",
+      "cantidad": 1650,
+      "unidad": "Kg",
+      "precio_unitario": 0.95,
+      "total_producto": 1567.5
+    },
+    {
+      "nombre_producto": "CEA20P00 PURE DE CEBOLLA 20 KG (LEO FOOD)",
+      "cantidad": 4800,
+      "unidad": "Kg",
+      "precio_unitario": 0.95,
+      "total_producto": 4560
+    }
+  ],
+  "total_pedido": 7835.3,
+  "observaciones": "Payment Terms: ANTICIPADO, Venc.: 05/01/2024, Total Plastic Non-Recycled: 22,51 C, Total Plastic Recycled: 50,02 KG"
+}
