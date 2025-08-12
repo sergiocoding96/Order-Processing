@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 import logger from './utils/logger.js';
+import { validateEnvironment } from './config/env-validator.js';
+import securityMonitor, { monitorRateLimit } from './utils/security-monitor.js';
 import healthRoutes from './routes/health.js';
 import webhookRoutes from './routes/webhooks.js';
 import monitoringRoutes from './routes/monitoring.js';
@@ -16,6 +18,43 @@ import { setTelegramBot } from './services/telegram-notifier.js';
 import keepAliveService from './services/keep-alive.js';
 
 dotenv.config();
+
+// Add startup delay to prevent rapid restarts causing 429 errors
+const startupDelay = parseInt(process.env.STARTUP_DELAY) || 0;
+if (process.env.NODE_ENV === 'production' && startupDelay > 0) {
+  logger.info(`Production startup delay: ${startupDelay}ms`);
+  // Use synchronous delay for startup
+  const start = Date.now();
+  while (Date.now() - start < startupDelay) {
+    // Blocking delay to prevent rapid restarts
+  }
+}
+
+// Validate environment configuration with simplified checks in production
+logger.info('Validating environment configuration...');
+try {
+  const envValidation = validateEnvironment();
+  if (!envValidation.isValid) {
+    if (process.env.NODE_ENV === 'production') {
+      // In production, only log warnings and continue
+      logger.warn('Environment validation issues detected:', {
+        errors: envValidation.errors,
+        warnings: envValidation.warnings
+      });
+    } else {
+      logger.error('Environment validation failed - application cannot start', {
+        errors: envValidation.errors,
+        warnings: envValidation.warnings
+      });
+      process.exit(1);
+    }
+  }
+} catch (error) {
+  logger.error('Environment validation error:', error.message);
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,7 +79,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting with security monitoring
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
@@ -49,6 +88,9 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  onLimitReached: (req, res, options) => {
+    monitorRateLimit(req.ip, req.path, options.max, options.max);
+  }
 });
 app.use(limiter);
 

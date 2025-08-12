@@ -1,0 +1,188 @@
+name: 🔒 Comprehensive Security Scan
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Secrets Detection
+  secrets-scan:
+    name: 🔍 Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_ENABLE_COMMENTS: true
+
+    - name: Advanced API Key Scan
+      run: |
+        echo "🔍 Running comprehensive API key detection..."
+        
+        # OpenAI API keys
+        if grep -rE "(sk-proj-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}|sk-[a-zA-Z0-9]{48})" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ OpenAI API key pattern detected!"
+          exit 1
+        fi
+        
+        # Google/Gemini API keys
+        if grep -rE "AIza[a-zA-Z0-9_-]{35}" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ Google/Gemini API key detected!"
+          exit 1
+        fi
+        
+        # Supabase keys
+        if grep -rE "(sb_secret_[a-zA-Z0-9_-]{40,}|eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*)" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ Supabase key detected!"
+          exit 1
+        fi
+        
+        # DeepSeek API keys
+        if grep -rE "sk-[a-f0-9]{32}" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ DeepSeek API key detected!"
+          exit 1
+        fi
+        
+        # Telegram Bot tokens
+        if grep -rE "[0-9]{8,10}:[a-zA-Z0-9_-]{35}" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ Telegram bot token detected!"
+          exit 1
+        fi
+        
+        # Anthropic API keys  
+        if grep -rE "sk-ant-[a-zA-Z0-9_-]{95,}" . --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md"; then
+          echo "❌ Anthropic API key detected!"
+          exit 1
+        fi
+        
+        echo "✅ No API keys detected in code"
+
+    - name: Check Environment Files
+      run: |
+        echo "🔍 Checking for committed environment files..."
+        
+        # Find any .env files (except templates and examples)
+        env_files=$(find . -name ".env*" -not -path "./node_modules/*" -not -name ".env.example" -not -name "*.template" -not -name "*.md")
+        
+        if [ ! -z "$env_files" ]; then
+          echo "❌ Environment files found in repository:"
+          echo "$env_files"
+          exit 1
+        fi
+        
+        # Check for backup files that might contain secrets
+        backup_files=$(find . \( -name "*.bak" -o -name "*.backup" -o -name "*.old" \) -not -path "./node_modules/*")
+        
+        if [ ! -z "$backup_files" ]; then
+          echo "❌ Backup files found in repository:"
+          echo "$backup_files"
+          exit 1
+        fi
+        
+        echo "✅ No environment or backup files committed"
+
+  # Dependency Security
+  dependency-security:
+    name: 🛡️ Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: |
+        echo "🔍 Running npm security audit..."
+        npm audit --audit-level high
+
+    - name: Check for outdated packages
+      run: |
+        echo "🔍 Checking for outdated packages..."
+        npm outdated || true
+
+  # Code Security Analysis
+  code-security:
+    name: 🧪 Code Security Analysis  
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Security Code Patterns
+      run: |
+        echo "🔍 Scanning for insecure code patterns..."
+        
+        # Check for eval() usage
+        if grep -rn "eval(" --include="*.js" src/; then
+          echo "❌ eval() usage detected - potential security risk"
+          exit 1
+        fi
+        
+        # Check for SQL injection patterns  
+        if grep -rn "query.*+.*req\." --include="*.js" src/; then
+          echo "❌ Potential SQL injection pattern detected"
+          exit 1
+        fi
+        
+        # Check for hardcoded secrets patterns
+        if grep -rni "password.*=.*['\"][^'\"]*['\"]" --include="*.js" src/; then
+          echo "❌ Hardcoded password detected"
+          exit 1
+        fi
+        
+        echo "✅ No insecure code patterns detected"
+
+  # Security Summary  
+  security-summary:
+    name: 📋 Security Summary
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, dependency-security, code-security]
+    if: always()
+    steps:
+    - name: Security Status Report
+      run: |
+        echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Secrets Detection | ${{ needs.secrets-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY  
+        echo "| Dependency Security | ${{ needs.dependency-security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Security | ${{ needs.code-security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.secrets-scan.result }}" == "success" && "${{ needs.dependency-security.result }}" == "success" && "${{ needs.code-security.result }}" == "success" ]]; then
+          echo "### ✅ All security checks passed!" >> $GITHUB_STEP_SUMMARY
+          echo "Repository is secure for deployment." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Security issues detected!" >> $GITHUB_STEP_SUMMARY  
+          echo "Please review and fix security issues before deployment." >> $GITHUB_STEP_SUMMARY
+        fi

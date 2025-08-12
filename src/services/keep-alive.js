@@ -10,7 +10,9 @@ class KeepAliveService {
   constructor() {
     this.interval = null;
     this.isEnabled = process.env.RENDER_FREE_TIER === 'true';
-    this.pingInterval = 10 * 60 * 1000; // 10 minutes
+    this.pingInterval = 15 * 60 * 1000; // 15 minutes (increased to reduce API calls)
+    this.retryCount = 0;
+    this.maxRetries = 3;
     this.businessHours = {
       start: 8, // 8 AM
       end: 20,  // 8 PM
@@ -47,25 +49,38 @@ class KeepAliveService {
       const memoryUsage = process.memoryUsage();
       const uptime = process.uptime();
       
-      // Log only during first ping of the day or every hour during business hours
+      // Reduced logging to prevent log spam
       const now = new Date();
-      const shouldLog = now.getMinutes() === 0 || uptime < 600; // First 10 minutes or on the hour
+      const shouldLog = uptime < 300 || (now.getMinutes() === 0 && now.getSeconds() < 30); // First 5 minutes or once per hour
       
       if (shouldLog) {
         logger.info('Keep-alive ping', {
           uptime: Math.floor(uptime / 60),
           memoryMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-          businessHours: this.isBusinessHours()
+          businessHours: this.isBusinessHours(),
+          retries: this.retryCount
         });
       }
 
-      // Perform lightweight database connection test during business hours
-      if (this.isBusinessHours()) {
+      // Only ping database during business hours and with backoff
+      if (this.isBusinessHours() && this.retryCount < this.maxRetries) {
         try {
-          const { testConnection } = await import('../config/database.js');
-          await testConnection();
+          // Don't import database during startup to avoid connection storms
+          if (uptime > 60) { // Wait 1 minute after startup
+            const { testConnection } = await import('../config/database.js');
+            await testConnection();
+            this.retryCount = 0; // Reset on success
+          }
         } catch (dbError) {
-          logger.warn('Keep-alive database ping failed', { error: dbError.message });
+          this.retryCount++;
+          logger.warn(`Keep-alive database ping failed (attempt ${this.retryCount}/${this.maxRetries})`, { 
+            error: dbError.message 
+          });
+          
+          // Exponential backoff - wait longer between retries
+          if (this.retryCount >= this.maxRetries) {
+            logger.warn('Maximum database ping retries reached, pausing database pings');
+          }
         }
       }
 

@@ -9,13 +9,23 @@ router.get('/health', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Optimized health check for Render free tier
-    const dbConnection = await Promise.race([
-      testConnection(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Database timeout')), 5000))
-    ]);
-    
+    // Simple health check to prevent 429 errors during startup
+    const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
+    let dbConnection = true; // Assume healthy initially
+    
+    // Only test database connection after 30 seconds uptime to prevent startup 429s
+    if (uptime > 30) {
+      try {
+        dbConnection = await Promise.race([
+          testConnection(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Database timeout')), 3000))
+        ]);
+      } catch (dbError) {
+        dbConnection = false;
+      }
+    }
+    
     const responseTime = Date.now() - startTime;
     
     const healthStatus = {

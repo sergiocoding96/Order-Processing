@@ -1,9 +1,7 @@
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
-
-dotenv.config();
+import { isProviderAvailable } from './env-validator.js';
 
 /**
  * AI MODEL ARCHITECTURE FOR ORDER PROCESSING SYSTEM
@@ -24,25 +22,12 @@ dotenv.config();
  * - Success rate: 57%+ (4/7 invoices, improving with better prompts)
  */
 
-// OpenAI client for GPT-4 Vision and GPT-4o-mini text processing
-const openaiApiKey = process.env.OPENAI_API_KEY;
-if (!openaiApiKey) {
-  logger.warn('OPENAI_API_KEY not set - GPT-4 Vision and GPT-4o-mini will not be available');
-}
-
-export const openai = openaiApiKey ? new OpenAI({
-  apiKey: openaiApiKey
+// Secure initialization of AI providers
+export const openai = isProviderAvailable('openai') ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 }) : null;
 
-
-
-// Google Gemini 2.0 Flash for fast reasoning
-const geminiApiKey = process.env.GEMINI_API_KEY;
-if (!geminiApiKey) {
-  logger.warn('GEMINI_API_KEY not set - Gemini 2.0 Flash will not be available');
-}
-
-export const gemini = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+export const gemini = isProviderAvailable('gemini') ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // AI provider availability check
 export const checkAIProviders = () => {

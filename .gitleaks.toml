@@ -1,0 +1,85 @@
+# Gitleaks configuration for order processing system
+title = "Order Processing Security Configuration"
+
+[extend]
+# Use default ruleset as base
+useDefault = true
+
+[[rules]]
+id = "supabase-service-key"
+description = "Supabase Service Key"
+regex = '''sb_secret_[A-Za-z0-9_-]{40,}'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "supabase-anon-key"
+description = "Supabase Anonymous Key"
+regex = '''eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*'''
+keywords = ["eyJ"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}'''
+keywords = ["sk-proj-", "sk-"]
+
+[[rules]]
+id = "gemini-api-key"
+description = "Google Gemini API Key"
+regex = '''AIza[0-9A-Za-z_-]{35}'''
+keywords = ["AIza"]
+
+[[rules]]
+id = "deepseek-api-key"
+description = "DeepSeek API Key"
+regex = '''sk-[a-f0-9]{32}'''
+keywords = ["deepseek", "sk-"]
+
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram Bot Token"
+regex = '''[0-9]{8,10}:[a-zA-Z0-9_-]{35}'''
+keywords = ["telegram", "bot"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic Claude API Key"
+regex = '''sk-ant-[a-zA-Z0-9_-]{95,}'''
+keywords = ["sk-ant-", "anthropic", "claude"]
+
+[allowlist]
+description = "Allowlist for false positives"
+files = [
+    # Template files are allowed to have placeholder patterns
+    "^.*\\.template$",
+    "^.*\\.example$",
+    "^docs/.*$",
+    "^README.*$"
+]
+
+commits = [
+    # Allow specific commits that have been manually reviewed
+]
+
+paths = [
+    # Exclude test fixtures that might contain fake keys
+    ".*/test_fixtures/.*",
+    ".*/mocks/.*"
+]
+
+regexes = [
+    # Allow placeholder API keys in documentation
+    "your-.*-key.*",
+    "sk-proj-example.*",
+    "AIza.*example.*"
+]
+
+[allowlist.stopwords]
+# Common words that might trigger false positives
+stopwords = [
+    "example",
+    "placeholder",
+    "your-key-here",
+    "replace-with-actual",
+    "test-key"
+]

@@ -1,0 +1,16 @@
+# Gitleaks ignore file
+# Template files with placeholder values are safe
+.env.example
+.env.production.template
+.env.render.template
+
+# Documentation examples
+README.md
+docs/
+DEPLOYMENT_*.md
+
+# Test files with mock data
+src/tests/
+test/
+*.test.js
+*.spec.js
