@@ -29,7 +29,8 @@ cp .env.example .env
 
 ### 3. Add API Keys
 Add these to your `.env` file:
-- `OPENAI_API_KEY` (GPT-4 Vision for visual analysis)
+- `OPENAI_API_KEY` (GPT-5 Vision for visual analysis)
+- `LEOS_FOODS_CIF` (CIF string used to classify invoice vs order)
 - `DEEPSEEK_API_KEY` (DeepSeek R1 for conversational agent)
 - `ANTHROPIC_API_KEY` (Claude 3.5 Sonnet as fallback)
 - `TELEGRAM_BOT_TOKEN` (from @BotFather)
@@ -54,7 +55,7 @@ curl http://localhost:3000/health
 ```
 Multi-Channel Input → AI Processing → Database Storage → Telegram Bot Interface
      ↓                    ↓              ↓                    ↓
-- Outlook Email      - GPT-4 Vision  - Supabase        - DeepSeek R1 Chat
+- Outlook Email      - GPT-5 Vision  - Supabase        - DeepSeek R1 Chat
 - Telegram Bot       - DeepSeek R1   - PostgreSQL      - Excel Reports  
 - PDF/Images         - Claude (fallback) - Transactions - Query Interface
 ```

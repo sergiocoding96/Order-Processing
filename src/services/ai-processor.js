@@ -1,36 +1,39 @@
 import { analyzeVisualContent, processTextWithFallback, generateChatResponse } from '../config/ai.js';
+import { DocumentClassifier } from '../ai/classifier.js';
+import XLSExporter from '../export/xlsExporter.js';
 import { PDFProcessor } from './pdf-processor.js';
 import { WebScraper } from './web-scraper.js';
 import logger from '../utils/logger.js';
+import SecurityUtils from '../utils/security.js';
 import fs from 'fs';
 import path from 'path';
 
 export class AIProcessor {
-  
+
   /**
    * Process content based on detection results
    */
   static async processContent(detection, contentData) {
     try {
       const processor = detection.primaryContent?.processor;
-      
+
       logger.info('Starting AI processing', {
         primaryContentType: detection.primaryContent?.type,
         processor: processor,
         hasProcessor: !!processor,
         primaryContent: detection.primaryContent
       });
-      
+
       switch (processor) {
-        case 'gpt4-vision':
+        case 'gpt5-vision':
           return await this.processVisualContent(detection, contentData);
-          
+
         case 'deepseek-r1':
           return await this.processTextContent(detection, contentData);
-          
+
         case 'web-scraper':
           return await this.processWebContent(detection, contentData);
-          
+
         default:
           throw new Error(`Unknown processor: ${processor}`);
       }
@@ -41,7 +44,7 @@ export class AIProcessor {
   }
 
   /**
-   * Process visual content (PDFs, images) using GPT-4 Vision
+   * Process visual content (PDFs, images) using GPT-5 Vision
    */
   static async processVisualContent(detection, contentData) {
     try {
@@ -56,37 +59,70 @@ export class AIProcessor {
 
       let imageData;
       let processingNote = '';
-      
+
       // Handle PDF files with streamlined processing
       if (detection.primaryContent?.type === 'pdf' && contentData.filePath) {
         logger.info('Processing PDF with streamlined pipeline');
         const pdfResult = await PDFProcessor.processPDF(contentData.filePath);
-        
+
         if (!pdfResult.success) {
           throw new Error(`PDF processing failed: ${pdfResult.error}`);
         }
 
+        // SECURITY FIX: Validate extracted data structure
+        const validatedData = SecurityUtils.validateObjectStructure(pdfResult.extractedData || {});
+        
         return {
           success: true,
-          extractedData: pdfResult.extractedData,
+          extractedData: validatedData,
           processingMethod: 'streamlined_pdf',
           confidence: pdfResult.confidence,
-          rawResponse: pdfResult.processingSteps,
+          rawResponse: SecurityUtils.truncateString(JSON.stringify(pdfResult.processingSteps), 2000),
           usage: pdfResult.usage || {}
         };
       }
-      
-      // Handle different input types for images
+
+      // SECURITY FIX: Safe buffer handling with memory limits
       if (contentData.filePath) {
-        // Local file
+        // Local file with size check
+        const stats = fs.statSync(contentData.filePath);
+        if (stats.size > 10 * 1024 * 1024) { // 10MB limit
+          throw new Error(`File too large: ${stats.size} bytes`);
+        }
         const fileBuffer = fs.readFileSync(contentData.filePath);
-        imageData = fileBuffer.toString('base64');
+        const safeBuffer = SecurityUtils.processBufferSafely(fileBuffer);
+        imageData = safeBuffer.toString('base64');
       } else if (contentData.url) {
-        // Download from URL
-        const response = await fetch(contentData.url);
-        const buffer = await response.arrayBuffer();
-        imageData = Buffer.from(buffer).toString('base64');
+        // Download with timeout and size limits
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        try {
+          const response = await fetch(contentData.url, { 
+            signal: controller.signal,
+            headers: { 'User-Agent': 'OrderProcessor/1.0' }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const contentLength = response.headers.get('content-length');
+          if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) {
+            throw new Error('Remote file too large');
+          }
+          
+          const buffer = await response.arrayBuffer();
+          const safeBuffer = SecurityUtils.processBufferSafely(Buffer.from(buffer));
+          imageData = safeBuffer.toString('base64');
+        } finally {
+          clearTimeout(timeoutId);
+        }
       } else if (contentData.base64) {
+        // Validate base64 and size
+        if (contentData.base64.length > 15 * 1024 * 1024) { // ~10MB base64
+          throw new Error('Base64 data too large');
+        }
         imageData = contentData.base64;
       } else {
         throw new Error('No valid image data provided');
@@ -128,29 +164,40 @@ Extract all visible product information accurately.`;
         temperature: 0.1
       });
 
-      // Try to parse JSON response
+      // SECURITY FIX: Safe JSON parsing with injection protection
       let extractedData;
       try {
         const jsonMatch = result.content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          extractedData = JSON.parse(jsonMatch[0]);
+          extractedData = SecurityUtils.safeJSONParse(jsonMatch[0]);
         } else {
           throw new Error('No JSON found in response');
         }
       } catch (parseError) {
         logger.warn('Failed to parse JSON from GPT-4 Vision response', parseError);
         // Fallback: extract structured data from text response
-        extractedData = this.extractDataFromText(result.content);
+        extractedData = this.extractDataFromText(SecurityUtils.truncateString(result.content, 10000));
       }
 
-      return {
+      const classification = DocumentClassifier.classify(result.content);
+
+      const response = {
         success: true,
         extractedData,
-        processingMethod: 'gpt4-vision',
+        processingMethod: 'gpt5-vision',
         confidence: this.calculateConfidence(extractedData),
         rawResponse: result.content,
-        usage: result.usage
+        usage: result.usage,
+        classification: classification.type
       };
+
+      // Optionally generate XLS
+      if (contentData?.generateXLS || process.env.AUTO_EXPORT_XLS === 'true') {
+        extractedData.tipo = classification.type;
+        await XLSExporter.generateFromStructuredData(extractedData, 'Test Files Leo Output');
+      }
+
+      return response;
 
     } catch (error) {
       logger.error('Visual content processing failed', error);
@@ -164,7 +211,7 @@ Extract all visible product information accurately.`;
   static async processTextContent(detection, contentData) {
     try {
       const textContent = contentData.text || contentData.content || '';
-      
+
       const orderExtractionPrompt = `Extract order information from this Spanish text and return ONLY a valid JSON object:
 
 Text to analyze:
@@ -202,28 +249,28 @@ Rules:
         responseFormat: { type: 'json_object' }
       });
 
-      // Parse JSON response (handle DeepSeek R1 reasoning format)
+      // SECURITY FIX: Safe JSON parsing for AI responses
       let extractedData;
       try {
         // DeepSeek R1 may include reasoning, try to extract JSON
-        let jsonContent = result.content;
-        
+        let jsonContent = SecurityUtils.truncateString(result.content, 50000);
+
         // If it's DeepSeek R1, look for JSON in the response
         if (result.provider === 'deepseek') {
-          const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+          const jsonMatch = jsonContent.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             jsonContent = jsonMatch[0];
           }
         }
-        
-        extractedData = JSON.parse(jsonContent);
+
+        extractedData = SecurityUtils.safeJSONParse(jsonContent);
       } catch (parseError) {
         logger.warn('Failed to parse JSON response, attempting text extraction', {
           provider: result.provider,
           error: parseError.message,
           responsePreview: result.content.substring(0, 200)
         });
-        extractedData = this.extractDataFromText(result.content);
+        extractedData = this.extractDataFromText(SecurityUtils.truncateString(result.content, 10000));
       }
 
       return {
@@ -247,7 +294,7 @@ Rules:
   static async processWebContent(detection, contentData) {
     try {
       const url = contentData.url;
-      
+
       if (!url) {
         throw new Error('No URL provided for web scraping');
       }
@@ -350,23 +397,23 @@ Rules:
    */
   static calculateConfidence(extractedData) {
     let score = 0;
-    
+
     // Check if we have products
     if (extractedData.productos && extractedData.productos.length > 0) {
       score += 0.4;
-      
+
       // Check product completeness
-      const completeProducts = extractedData.productos.filter(p => 
+      const completeProducts = extractedData.productos.filter(p =>
         p.nombre_producto && p.cantidad && p.precio_unitario
       );
       score += (completeProducts.length / extractedData.productos.length) * 0.4;
     }
-    
+
     // Check if we have total
     if (extractedData.total_pedido && extractedData.total_pedido > 0) {
       score += 0.1;
     }
-    
+
     // Check if we have order details
     if (extractedData.numero_pedido || extractedData.cliente || extractedData.fecha_pedido) {
       score += 0.1;
@@ -380,7 +427,7 @@ Rules:
    */
   static validateExtractedData(extractedData) {
     const errors = [];
-    
+
     if (!extractedData.productos || extractedData.productos.length === 0) {
       errors.push('No products found in extracted data');
     }

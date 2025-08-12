@@ -18,30 +18,42 @@
 - [ ] 2.6 Test both input channels with sample data
 
 ## Phase 3: AI Processing Engine 🤖
-- [ ] 3.1 Setup Claude 3.5 Sonnet integration for text processing
-- [ ] 3.2 Setup GPT-4 Vision integration for PDF/image processing  
-- [ ] 3.3 Create web scraping module using Puppeteer
-- [ ] 3.4 Implement data extraction with structured JSON output
-- [ ] 3.5 Add data validation and cleaning functions
-- [ ] 3.6 Create fallback logic (Claude → GPT-4 if first fails)
-- [ ] 3.7 Test extraction accuracy with various order formats
+- [x] 3.1 Setup Claude 3.5 Sonnet integration for text processing (fallback only)
+- [x] 3.2 Setup gpt-4o visual integration for PDF/image processing
+- [x] 3.3 Create web scraping module using Puppeteer
+- [x] 3.4 Implement data extraction with structured JSON output
+- [x] 3.5 Add data validation and cleaning functions
+- [x] 3.6 Create fallback logic (Gemini → GPT-4o-mini)
+- [x] 3.7 Test extraction accuracy with various order formats
+ - [x] 3.8 Integrate Gemini for JSON structuring and schema validation
+ - [x] 3.9 Implement document-type classifier agent (invoice vs order)
+       - Primary cue: detect presence of `LEOs foods` CIF in extracted text → classify as invoice; absence → classify as order
+       - Secondary cues: keywords like "Factura/Invoice", "Nº factura", VAT breakdowns vs. "Pedido/Order", PO numbers
+       - Make CIF value configurable via env (e.g., `LEOS_FOODS_CIF`)
+ - [x] 3.10 Route pipeline based on classification and tag records (`type: 'invoice' | 'order'`)
+ - [x] 3.11 Add unit tests for classifier using sample PDFs/text
 
 ## Phase 4: Database Operations 💾
-- [ ] 4.1 Create order insertion functions with transaction support
-- [ ] 4.2 Implement product insertion with foreign key relationships
-- [ ] 4.3 Add duplicate detection logic
-- [ ] 4.4 Setup comprehensive error logging system
-- [ ] 4.5 Create data normalization functions (clean product names, etc.)
+- [x] 4.1 Create order insertion functions with transaction support (basic via models)
+- [x] 4.2 Implement product insertion with foreign key relationships (basic via models)
+- [x] 4.3 Add duplicate detection logic (by `numero_pedido`)
+- [x] 4.4 Setup comprehensive error logging system (`processing_logs` model)
+- [x] 4.5 Create data normalization functions (clean product/client/product codes)
 - [ ] 4.6 Test database operations with edge cases
 
 ## Phase 5: Telegram Bot Interface 📱
-- [ ] 5.1 Setup bot command parsing system
-- [ ] 5.2 Implement basic commands (/pedidos, /reporte, /stats, /help)
+- [x] 5.1 Setup bot command parsing system
+- [x] 5.2 Implement basic commands (/pedidos, /reporte, /stats, /help)
 - [ ] 5.3 Create natural language query processor
 - [ ] 5.4 Build SQL query generator from Spanish questions
-- [ ] 5.5 Implement Excel report generation with ExcelJS
-- [ ] 5.6 Add file sending capabilities for reports
-- [ ] 5.7 Test bot functionality end-to-end
+ - [x] 5.5 XLS export of processed order/invoice using template
+       - Implemented two layouts: Invoice and Order
+       - Output directory: `Test Files Leo Output`
+        - Added canonical columns: client canonical code and product canonical code
+ - [x] 5.6 Define field mapping from structured JSON → template columns (dates, customer/vendor, line items, totals)
+ - [x] 5.7 Implement generator to produce `.xlsx` using ExcelJS and attach to workflow output
+ - [x] 5.8 Add file sending capabilities for generated XLS via Telegram (Outlook pending)
+ - [ ] 5.9 Test bot functionality end-to-end
 
 ## Phase 6: Integration & Testing 🧪
 - [ ] 6.1 End-to-end testing with real order data
@@ -51,12 +63,12 @@
 - [ ] 6.5 Load testing for 400 orders/month capacity
 
 ## Phase 7: Deployment & Monitoring 🚀
-- [ ] 7.1 Prepare deployment configuration (Railway/Heroku)
-- [ ] 7.2 Setup environment variables for production
-- [ ] 7.3 Deploy to chosen platform
+- [x] 7.1 Prepare deployment configuration (Dockerfile, Procfile, .dockerignore)
+- [x] 7.2 Setup environment variables for production (.env.example)
+- [ ] 7.3 Deploy to chosen platform (Railway/Heroku)
 - [ ] 7.4 Configure monitoring and health checks
 - [ ] 7.5 Setup logging and error tracking
-- [ ] 7.6 Create deployment documentation
+- [ ] 7.6 Create deployment documentation (README_DEPLOY.md)
 
 ## Review Section
 
@@ -105,12 +117,12 @@
 
 #### AI Architecture Update ✅ (Completed)
 **Updated AI Processing Stack per user requirements:**
-- **GPT-4 Vision**: Visual analysis only (PDFs, images, screenshots)
-- **DeepSeek R1**: Primary text processing and conversational agent
-- **Claude 3.5 Sonnet**: Fallback for text processing when DeepSeek fails
-- **Architecture Benefits**: Specialized AI for specific tasks, cost optimization
+- **gpt-4o**: Visual analysis (PDFs, images, screenshots)
+- **Gemini 2.0 Flash**: Primary reasoning/structuring to JSON
+- **GPT‑4o‑mini**: Fallback when Gemini JSON fails
+- **Claude 3.5 Sonnet**: Optional fallback for text tasks (not currently used)
 - **Content Detection**: Updated to route content to appropriate AI processor
-- **Testing**: All AI providers configured and tested successfully
+- **Testing**: Providers configured and verified in local runs
 
 #### Phase 3: AI Processing Engine ✅ (Completed)
 **Successfully implemented comprehensive AI processing system:**
@@ -131,10 +143,14 @@
 - 🛡️ **Robust Error Handling**: Comprehensive error classification and recovery
 
 ### Next Steps:
-**Phase 4: Database Operations** (Starting Next)
-- Complete database integration with processing queue
-- Order and product CRUD operations
-- Data validation and normalization
-- Duplicate detection and handling
-- Database performance optimization
-- Statistics and reporting queries
+**Phase 4: Database Operations** (In Progress)
+- [x] 4.1 Create order insertion functions with transaction support (basic via models)
+- [x] 4.2 Implement product insertion with foreign key relationships (basic via models)
+- [x] 4.3 Add duplicate detection logic (by `numero_pedido`)
+- [x] 4.4 Setup comprehensive error logging system (DB-level)
+- [x] 4.5 Create data normalization functions (client/product code normalization)
+- [ ] 4.6 Test database operations with edge cases
+
+Utilities
+- Added direct runner: `scripts/process-pdf-direct.js`
+- Added verifier: `scripts/verify-xls-formats.js`

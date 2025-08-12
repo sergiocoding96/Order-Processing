@@ -2,6 +2,11 @@ import { AIProcessor } from './ai-processor.js';
 import { ContentDetector } from './content-detector.js';
 import { PedidosModel } from '../models/pedidos.js';
 import { ProductosModel } from '../models/productos.js';
+import { normalizeOrderData } from '../utils/normalizer.js';
+import { LogsModel } from '../models/logs.js';
+import { CodeMatcher } from './code-matcher.js';
+import XLSExporter from '../export/xlsExporter.js';
+import { sendTelegramDocument, sendTelegramMessage } from './telegram-notifier.js';
 import logger from '../utils/logger.js';
 
 export class ProcessingQueue {
@@ -52,7 +57,7 @@ export class ProcessingQueue {
    */
   async startProcessing() {
     if (this.processing) return;
-    
+
     this.processing = true;
     logger.info('Processing queue started');
 
@@ -83,6 +88,7 @@ export class ProcessingQueue {
       attempt: item.attempts,
       contentType: item.detection.primaryContent?.type
     });
+    await LogsModel.write('info', 'queue_item_started', { id: item.id, attempt: item.attempts, source: item.webhookData.source });
 
     try {
       // Check if content is processable
@@ -111,8 +117,13 @@ export class ProcessingQueue {
         // Continue anyway but log warnings
       }
 
+      // Normalize extracted data
+      const normalized = normalizeOrderData(aiResult.extractedData);
+      // Enrich with canonical codes via hybrid matcher (DB → Gemini → alias)
+      const enriched = await CodeMatcher.enrichWithCanonicalCodes(normalized);
+
       // Save to database
-      const savedOrder = await this.saveToDatabase(aiResult.extractedData, item.webhookData);
+      const savedOrder = await this.saveToDatabase(enriched, item.webhookData);
 
       // Mark as completed
       item.status = 'completed';
@@ -130,9 +141,10 @@ export class ProcessingQueue {
         processingTime: item.processingTime,
         confidence: aiResult.confidence
       });
+      await LogsModel.write('info', 'queue_item_completed', { id: item.id, orderId: savedOrder.id, confidence: aiResult.confidence, source: item.webhookData.source });
 
-      // Send confirmation if needed
-      await this.sendProcessingConfirmation(item, savedOrder);
+      // Generate XLS and send Telegram confirmation if needed
+      await this.sendProcessingConfirmation(item, savedOrder, enriched);
 
     } catch (error) {
       logger.error('Queue item processing failed', {
@@ -140,12 +152,13 @@ export class ProcessingQueue {
         attempt: item.attempts,
         error: error.message
       });
+      await LogsModel.write('error', 'queue_item_failed', { id: item.id, attempt: item.attempts, error: error.message, source: item.webhookData.source });
 
       // Handle retry logic
       if (item.attempts < this.retryAttempts) {
         item.status = 'pending';
         item.retryAt = Date.now() + this.retryDelay;
-        
+
         // Add back to queue for retry
         setTimeout(() => {
           this.queue.unshift(item);
@@ -160,6 +173,7 @@ export class ProcessingQueue {
           nextAttempt: item.attempts + 1,
           retryIn: this.retryDelay / 1000 + ' seconds'
         });
+        await LogsModel.write('warn', 'queue_item_retry_scheduled', { id: item.id, nextAttempt: item.attempts + 1, retryInMs: this.retryDelay, source: item.webhookData.source });
       } else {
         // Max retries reached, mark as failed
         item.status = 'failed';
@@ -171,13 +185,14 @@ export class ProcessingQueue {
           error: error.message,
           attempts: item.attempts
         });
+        await LogsModel.write('error', 'queue_item_failed_permanently', { id: item.id, attempts: item.attempts, error: error.message, source: item.webhookData.source });
 
         // Optionally send failure notification
         await this.sendProcessingFailure(item, error);
       }
     } finally {
       this.currentlyProcessing--;
-      
+
       // Continue processing queue
       if (this.queue.length > 0 && this.currentlyProcessing < this.maxConcurrent) {
         setTimeout(() => this.startProcessing(), 100);
@@ -276,15 +291,26 @@ export class ProcessingQueue {
   /**
    * Send processing confirmation
    */
-  async sendProcessingConfirmation(item, savedOrder) {
+  async sendProcessingConfirmation(item, savedOrder, enrichedData) {
     try {
       if (item.webhookData.source === 'telegram' && item.webhookData.chatId) {
-        // Send Telegram confirmation (placeholder)
-        logger.info('Would send Telegram confirmation', {
-          chatId: item.webhookData.chatId,
-          orderId: savedOrder.id
-        });
-        // TODO: Implement Telegram bot response
+        // Auto-export XLS for Telegram confirmation
+        try {
+          const dataForXls = { ...enrichedData, tipo: enrichedData?.tipo || 'order' };
+          const xls = await XLSExporter.generateFromStructuredData(dataForXls, process.env.XLS_OUTPUT_DIR || 'Test Files Leo Output');
+          if (xls?.success) {
+            await sendTelegramDocument(item.webhookData.chatId, xls.path, {
+              filename: xls.path.split('/').pop(),
+              caption: `✅ Procesado. Pedido/Factura ID ${savedOrder.id}`,
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+          } else {
+            await sendTelegramMessage(item.webhookData.chatId, `✅ Procesado. ID ${savedOrder.id}. (No se pudo adjuntar XLS)`);
+          }
+        } catch (attachErr) {
+          logger.warn('Failed to generate/send XLS to Telegram', { error: attachErr.message });
+          await sendTelegramMessage(item.webhookData.chatId, `✅ Procesado. ID ${savedOrder.id}.`);
+        }
       }
     } catch (error) {
       logger.error('Failed to send processing confirmation', error);
@@ -301,7 +327,9 @@ export class ProcessingQueue {
         source: item.webhookData.source,
         error: error.message
       });
-      // TODO: Implement failure notifications
+      if (item.webhookData.source === 'telegram' && item.webhookData.chatId) {
+        await sendTelegramMessage(item.webhookData.chatId, `❌ Error procesando: ${error.message}`);
+      }
     } catch (notificationError) {
       logger.error('Failed to send failure notification', notificationError);
     }

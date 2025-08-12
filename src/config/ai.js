@@ -55,23 +55,66 @@ export const checkAIProviders = () => {
   return providers;
 };
 
-// GPT-4 Vision for visual analysis (PDFs, images)
+// Vision model for visual analysis (PDFs, images)
 export const analyzeVisualContent = async (imageData, prompt, options = {}) => {
   if (!openai) {
     throw new Error('OpenAI client not configured - OPENAI_API_KEY missing');
   }
 
   try {
-    const response = await openai.chat.completions.create({
-      model: options.model || 'gpt-4o',
+    const preferredModel = options.model || 'gpt-4o';
+
+    // Try GPT-5 via Responses API first
+    if ((preferredModel || '').toLowerCase().startsWith('gpt-5')) {
+      try {
+        const response = await openai.responses.create({
+          model: preferredModel,
+          input: [
+            {
+              role: 'user',
+              content: [
+                { type: 'input_text', text: prompt },
+                {
+                  type: 'input_image',
+                  image_url: imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${imageData}`,
+                  detail: options.detail || 'high'
+                }
+              ]
+            }
+          ],
+          // Some GPT-5 models do not accept temperature; omit it
+          max_output_tokens: options.maxCompletionTokens || options.maxTokens || 4000
+        });
+
+        const content = response.output_text || response.output?.[0]?.content?.[0]?.text || '';
+
+        logger.info('Vision analysis completed', {
+          model: preferredModel,
+          usage: response.usage
+        });
+
+        return {
+          success: true,
+          content,
+          usage: response.usage,
+          model: preferredModel
+        };
+      } catch (err) {
+        // Fall through to GPT-4o if model not found or unsupported params
+        const msg = err?.message || '';
+        logger.warn('GPT-5 vision call failed, falling back to gpt-4o', { error: msg });
+      }
+    }
+
+    // Fallback to Chat Completions API with gpt-4o
+    const model = 'gpt-4o';
+    const request = {
+      model,
       messages: [
         {
           role: 'user',
           content: [
-            {
-              type: 'text',
-              text: prompt
-            },
+            { type: 'text', text: prompt },
             {
               type: 'image_url',
               image_url: {
@@ -82,11 +125,13 @@ export const analyzeVisualContent = async (imageData, prompt, options = {}) => {
           ]
         }
       ],
-      max_tokens: options.maxTokens || 4000,
-      temperature: options.temperature || 0.1
-    });
+      temperature: options.temperature ?? 0.1,
+      max_tokens: options.maxTokens || 4000
+    };
 
-    logger.info('GPT-4 Vision analysis completed', {
+    const response = await openai.chat.completions.create(request);
+
+    logger.info('Vision analysis completed', {
       model: response.model,
       usage: response.usage
     });
@@ -98,7 +143,7 @@ export const analyzeVisualContent = async (imageData, prompt, options = {}) => {
       model: response.model
     };
   } catch (error) {
-    logger.error('GPT-4 Vision analysis failed', error);
+    logger.error('Vision analysis failed', error);
     throw error;
   }
 };
@@ -150,7 +195,7 @@ export const processWithGemini = async (prompt, options = {}) => {
   }
 
   try {
-    const model = gemini.getGenerativeModel({ 
+    const model = gemini.getGenerativeModel({
       model: options.model || 'gemini-2.0-flash-exp',
       generationConfig: {
         temperature: options.temperature || 0.1,
@@ -189,13 +234,13 @@ export const processTextWithFallback = async (prompt, options = {}) => {
   // Try Gemini 2.0 Flash with retry logic
   if (gemini) {
     const maxRetries = options.maxRetries || 2;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         logger.info(`Attempting text processing with Gemini 2.0 Flash (attempt ${attempt}/${maxRetries})`);
         const result = await processWithGemini(prompt, options);
         result.provider = 'gemini';
-        
+
         // Validate JSON response if JSON format is requested
         if (options.responseFormat?.type === 'json_object') {
           try {
@@ -215,19 +260,19 @@ export const processTextWithFallback = async (prompt, options = {}) => {
             }
           }
         }
-        
+
         return result; // Success!
-        
+
       } catch (error) {
         logger.warn(`Gemini 2.0 Flash attempt ${attempt} failed: ${error.message}`);
         errors.push({ provider: 'gemini', attempt, error: error.message });
-        
+
         // For API errors, don't retry - go straight to fallback
         if (error.message.includes('API') || error.message.includes('rate limit') || error.message.includes('quota')) {
           logger.warn('Gemini API error detected, skipping retries and using fallback');
           break;
         }
-        
+
         // For last attempt, continue to fallback
         if (attempt === maxRetries) {
           logger.warn('Gemini max retries reached, falling back to GPT-4o-mini');
@@ -240,8 +285,8 @@ export const processTextWithFallback = async (prompt, options = {}) => {
   if (openai) {
     try {
       logger.info('Using GPT-4o-mini fallback (fast and reliable with structured outputs)');
-      const result = await processWithOpenAI(prompt, { 
-        ...options, 
+      const result = await processWithOpenAI(prompt, {
+        ...options,
         model: 'gpt-4o-mini',
         responseFormat: options.responseFormat || { type: 'json_object' }
       });
@@ -272,7 +317,7 @@ Please provide a helpful and concise response in Spanish. If the user is asking 
       model: 'gpt-4o-mini',
       temperature: options.temperature || 0.3
     });
-    
+
     return {
       success: true,
       response: result.content,

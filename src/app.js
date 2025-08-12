@@ -10,6 +10,10 @@ import fs from 'fs';
 import logger from './utils/logger.js';
 import healthRoutes from './routes/health.js';
 import webhookRoutes from './routes/webhooks.js';
+import monitoringRoutes from './routes/monitoring.js';
+import startTelegramBot from './services/telegram-bot.js';
+import { setTelegramBot } from './services/telegram-notifier.js';
+import keepAliveService from './services/keep-alive.js';
 
 dotenv.config();
 
@@ -30,8 +34,8 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.WEBHOOK_BASE_URL] 
+  origin: process.env.NODE_ENV === 'production'
+    ? [process.env.WEBHOOK_BASE_URL]
     : true,
   credentials: true
 }));
@@ -65,6 +69,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/', healthRoutes);
 app.use('/', webhookRoutes);
+app.use('/', monitoringRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -86,8 +91,8 @@ app.use((err, req, res, next) => {
   });
 
   res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
       : err.message,
     path: req.path
   });
@@ -96,6 +101,7 @@ app.use((err, req, res, next) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  keepAliveService.stop();
   server.close(() => {
     logger.info('Process terminated');
     process.exit(0);
@@ -104,6 +110,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
+  keepAliveService.stop();
   server.close(() => {
     logger.info('Process terminated');
     process.exit(0);
@@ -113,8 +120,24 @@ process.on('SIGINT', () => {
 const server = app.listen(PORT, () => {
   logger.info(`🚀 Pedidos Automation Server started on port ${PORT}`, {
     environment: process.env.NODE_ENV || 'development',
-    port: PORT
+    port: PORT,
+    platform: process.env.RENDER_FREE_TIER ? 'Render Free Tier' : 'Standard'
   });
+  
+  // Start Telegram bot if configured
+  try {
+    const bot = startTelegramBot();
+    if (bot) setTelegramBot(bot);
+  } catch (e) {
+    logger.warn('Telegram bot failed to start', { error: e.message });
+  }
+
+  // Start keep-alive service for Render free tier
+  try {
+    keepAliveService.start();
+  } catch (e) {
+    logger.warn('Keep-alive service failed to start', { error: e.message });
+  }
 });
 
 export default app;

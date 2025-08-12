@@ -3,7 +3,7 @@ import fs from 'fs';
 import logger from '../utils/logger.js';
 
 export class ContentDetector {
-  
+
   /**
    * Detect content type from various inputs
    * @param {Object} input - Input data from webhook
@@ -70,6 +70,7 @@ export class ContentDetector {
         description: bodyType.description,
         source: 'email_body',
         content: input.body,
+        urls: bodyType.urls || [],
         bodyType: input.bodyType || 'text'
       });
 
@@ -127,7 +128,8 @@ export class ContentDetector {
         processor: bodyType.processor,
         description: bodyType.description,
         source: 'email_body',
-        content: input.body
+        content: input.body,
+        urls: bodyType.urls || []
       });
 
       // If no attachments, body becomes primary
@@ -230,13 +232,13 @@ export class ContentDetector {
     const mimeType = file.mimetype || file.mimeType || '';
     const extension = path.extname(filename).toLowerCase();
 
-    // PDF files - use streamlined processing (GPT-4 Vision + DeepSeek R1)
+    // PDF files - use streamlined processing (GPT-5 Vision + DeepSeek R1)
     if (extension === '.pdf' || mimeType.includes('pdf')) {
       return {
         type: 'pdf',
         confidence: 0.95,
-        processor: 'gpt4-vision',
-        description: 'PDF document requiring streamlined processing (GPT-4 Vision + DeepSeek R1)'
+        processor: 'gpt5-vision',
+        description: 'PDF document requiring streamlined processing (GPT-5 Vision + DeepSeek R1)'
       };
     }
 
@@ -246,8 +248,8 @@ export class ContentDetector {
       return {
         type: 'image',
         confidence: 0.9,
-        processor: 'gpt4-vision',
-        description: 'Image file requiring GPT-4 Vision analysis'
+        processor: 'gpt5-vision',
+        description: 'Image file requiring GPT-5 Vision analysis'
       };
     }
 
@@ -306,8 +308,8 @@ export class ContentDetector {
         return {
           type: 'pdf_url',
           confidence: 0.9,
-          processor: 'gpt4-vision',
-          description: 'PDF URL requiring download and GPT-4 Vision analysis'
+          processor: 'gpt5-vision',
+          description: 'PDF URL requiring download and GPT-5 Vision analysis'
         };
       }
 
@@ -317,8 +319,8 @@ export class ContentDetector {
         return {
           type: 'image_url',
           confidence: 0.85,
-          processor: 'gpt4-vision',
-          description: 'Image URL requiring download and GPT-4 Vision analysis'
+          processor: 'gpt5-vision',
+          description: 'Image URL requiring download and GPT-5 Vision analysis'
         };
       }
 
@@ -363,7 +365,7 @@ export class ContentDetector {
     ];
 
     const spanishMatches = spanishOrderPatterns.filter(pattern => pattern.test(text)).length;
-    
+
     if (spanishMatches >= 3) {
       return {
         type: 'spanish_order_table',
@@ -386,7 +388,7 @@ export class ContentDetector {
     ];
 
     const orderMatches = orderPatterns.filter(pattern => pattern.test(text)).length;
-    
+
     if (orderMatches >= 2) {
       return {
         type: 'order_text',
@@ -403,7 +405,7 @@ export class ContentDetector {
       return {
         type: 'text_with_urls',
         confidence: 0.8,
-        processor: 'url-extractor',
+        processor: 'web-scraper',
         description: 'Text containing URLs for processing',
         urls: urls
       };
@@ -448,16 +450,16 @@ export class ContentDetector {
 
     const unprocessableTypes = ['unknown', 'empty_text', 'invalid_url'];
     if (unprocessableTypes.includes(detection.primaryContent.type)) {
-      return { 
-        processable: false, 
-        reason: `Content type '${detection.primaryContent.type}' is not processable` 
+      return {
+        processable: false,
+        reason: `Content type '${detection.primaryContent.type}' is not processable`
       };
     }
 
     if (detection.primaryContent.confidence < 0.3) {
-      return { 
-        processable: false, 
-        reason: 'Content detection confidence too low' 
+      return {
+        processable: false,
+        reason: 'Content detection confidence too low'
       };
     }
 

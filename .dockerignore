@@ -1,0 +1,56 @@
+node_modules
+npm-debug.log*
+Dockerfile
+.dockerignore
+.git
+.gitignore
+logs
+uploads
+coverage
+test-results
+*.local
+.env
+.env.bak
+
+# Documentation and development files
+*.md
+docs/
+README*
+TESTING*
+TODO*
+CLAUDE*
+
+# Large local assets not needed in image
+Test Files Leo
+Test Files Leo Output
+Order Test/
+leo_results
+temp
+temp_images
+test_output
+
+# Development tools
+.DS_Store
+.nyc_output
+*.log
+
+# Render-specific exclusions
+render.yaml
+.env.render
+.env.example
+.env.bak
+
+# Deploy scripts and configs
+deploy-*.sh
+railway.json
+Procfile
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db

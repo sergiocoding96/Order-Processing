@@ -102,6 +102,7 @@ curl http://localhost:3000/webhook/queue/status
 - **Fix**: Check your `.env` file has:
   ```
   OPENAI_API_KEY=sk-proj-...
+  LEOS_FOODS_CIF=B12345678
   DEEPSEEK_API_KEY=sk-...
   ```
 

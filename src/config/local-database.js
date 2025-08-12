@@ -74,6 +74,14 @@ export class LocalDatabase {
   static async createPedido(orderData) {
     try {
       const pedidos = this.readPedidos();
+      // Duplicate detection by numero_pedido (if provided)
+      if (orderData.numero_pedido) {
+        const existing = pedidos.find(p => p.numero_pedido === orderData.numero_pedido);
+        if (existing) {
+          logger.info('Duplicate order detected (local DB), returning existing', { orderId: existing.id });
+          return existing;
+        }
+      }
       const newPedido = {
         id: this.generateId(),
         numero_pedido: orderData.numero_pedido,
@@ -103,7 +111,7 @@ export class LocalDatabase {
     try {
       const pedidos = this.readPedidos();
       const pedido = pedidos.find(p => p.id === id);
-      
+
       if (pedido) {
         // Get associated products
         const productos = this.readProductos();
@@ -163,26 +171,39 @@ export class LocalDatabase {
   static async createProductos(pedidoId, productos) {
     try {
       const existingProductos = this.readProductos();
-      const newProductos = productos.map(producto => ({
-        id: this.generateId(),
-        pedido_id: pedidoId,
-        nombre: producto.nombre,
-        cantidad: producto.cantidad,
-        precio_unitario: producto.precio_unitario,
-        precio_total: producto.precio_total,
-        unidad: producto.unidad,
-        observaciones: producto.observaciones || '',
-        created_at: new Date().toISOString()
-      }));
+      const newProductos = productos.map(raw => {
+        const nombre = raw.nombre ?? raw.nombre_producto ?? raw.descripcion ?? '';
+        const cantidad = raw.cantidad ?? null;
+        const precioUnitario = raw.precio_unitario ?? null;
+        let precioTotal = raw.precio_total ?? raw.total_producto ?? null;
+        if ((precioTotal === null || precioTotal === undefined) &&
+          typeof cantidad === 'number' && typeof precioUnitario === 'number') {
+          precioTotal = cantidad * precioUnitario;
+        }
+        const unidad = raw.unidad ?? '';
+        const observaciones = raw.observaciones || '';
+
+        return {
+          id: this.generateId(),
+          pedido_id: pedidoId,
+          nombre,
+          cantidad,
+          precio_unitario: precioUnitario,
+          precio_total: precioTotal,
+          unidad,
+          observaciones,
+          created_at: new Date().toISOString()
+        };
+      });
 
       existingProductos.push(...newProductos);
       this.writeProductos(existingProductos);
 
-      logger.info('Products created successfully (local DB)', { 
-        pedidoId, 
-        productCount: newProductos.length 
+      logger.info('Products created successfully (local DB)', {
+        pedidoId,
+        productCount: newProductos.length
       });
-      
+
       return newProductos;
     } catch (error) {
       logger.error('Error creating products (local DB)', { pedidoId, error });
@@ -194,7 +215,7 @@ export class LocalDatabase {
   static async getStats(filters = {}) {
     try {
       const pedidos = await this.findAllPedidos(filters);
-      
+
       const stats = {
         total_orders: pedidos.length,
         total_amount: pedidos.reduce((sum, order) => sum + parseFloat(order.total_pedido || 0), 0),
@@ -205,16 +226,16 @@ export class LocalDatabase {
 
       pedidos.forEach(order => {
         // By channel
-        stats.by_channel[order.canal_origen] = 
+        stats.by_channel[order.canal_origen] =
           (stats.by_channel[order.canal_origen] || 0) + 1;
-        
+
         // By status
-        stats.by_status[order.estado] = 
+        stats.by_status[order.estado] =
           (stats.by_status[order.estado] || 0) + 1;
       });
 
-      stats.avg_order_value = stats.total_orders > 0 
-        ? stats.total_amount / stats.total_orders 
+      stats.avg_order_value = stats.total_orders > 0
+        ? stats.total_amount / stats.total_orders
         : 0;
 
       return stats;

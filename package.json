@@ -6,10 +6,18 @@
   "type": "module",
   "scripts": {
     "start": "node src/app.js",
+    "start:production": "NODE_ENV=production node --max-old-space-size=512 src/app.js",
+    "build:production": "echo 'Creating production directories...' && mkdir -p logs tmp/uploads tmp/reports tmp/processing && echo 'Production build completed'",
     "dev": "node --watch src/app.js",
     "test": "node --test src/tests/**/*.test.js",
     "test:unit": "node --test src/tests/unit/**/*.test.js",
-    "test:integration": "node --test src/tests/integration/**/*.test.js"
+    "test:integration": "node --test src/tests/integration/**/*.test.js",
+    "db:setup": "node scripts/setup-database.js",
+    "db:health": "node scripts/setup-database.js",
+    "db:maintenance": "node scripts/database-maintenance.js",
+    "db:export": "node scripts/database-maintenance.js --export",
+    "render:build": "npm ci --only=production && npm run build:production",
+    "render:start": "npm run start:production"
   },
   "keywords": [
     "automation",

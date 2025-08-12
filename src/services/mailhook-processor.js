@@ -7,14 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class MailhookProcessor {
-  
+
   /**
    * Process mailhook data from various providers
    */
   static processMailhook(body, files = []) {
     // Detect mailhook provider and format
     const provider = this.detectProvider(body);
-    
+
     logger.info('Processing mailhook', {
       provider: provider.name,
       confidence: provider.confidence,
@@ -158,7 +158,7 @@ export class MailhookProcessor {
   static normalizeEmailData(emailData) {
     // Extract primary content (prefer text over HTML for order processing)
     let primaryContent = emailData.textBody;
-    
+
     if (!primaryContent && emailData.htmlBody) {
       // Convert HTML to text (basic)
       primaryContent = this.htmlToText(emailData.htmlBody);
@@ -202,7 +202,7 @@ export class MailhookProcessor {
    */
   static htmlToText(html) {
     if (!html) return '';
-    
+
     return html
       // Remove script and style elements
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -253,7 +253,7 @@ export class MailhookProcessor {
    */
   static extractOrderContent(emailData) {
     const content = emailData.body;
-    
+
     // Look for order patterns in the email
     const orderPatterns = [
       // Spanish order tables
@@ -265,7 +265,7 @@ export class MailhookProcessor {
     ];
 
     const extractedSections = [];
-    
+
     for (const pattern of orderPatterns) {
       const matches = content.match(pattern);
       if (matches) {
@@ -298,13 +298,13 @@ export class MailhookProcessor {
     };
 
     for (const field of requiredFields) {
-      const hasField = body[field] || 
-                     alternativeFields[field]?.some(alt => {
-                       return alt.includes('.') ? 
-                         alt.split('.').reduce((obj, key) => obj?.[key], body) : 
-                         body[alt];
-                     });
-      
+      const hasField = body[field] ||
+        alternativeFields[field]?.some(alt => {
+          return alt.includes('.') ?
+            alt.split('.').reduce((obj, key) => obj?.[key], body) :
+            body[alt];
+        });
+
       if (!hasField) {
         validation.errors.push(`Missing required field: ${field}`);
       }
@@ -379,7 +379,7 @@ export class MailhookProcessor {
       return {
         type: 'pdf',
         processable: true,
-        method: 'gpt4-vision',
+        method: 'gpt5-vision',
         description: 'PDF document requiring visual analysis'
       };
     }
@@ -389,7 +389,7 @@ export class MailhookProcessor {
       return {
         type: 'image',
         processable: true,
-        method: 'gpt4-vision',
+        method: 'gpt5-vision',
         description: 'Image requiring visual analysis'
       };
     }

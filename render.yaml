@@ -1,0 +1,111 @@
+# Render Blueprint for Leo Order Processing System
+# Optimized for FREE tier deployment with webhook reliability
+
+services:
+  # Main Web Service (FREE tier: 750 hours/month)
+  - type: web
+    name: leo-orders-api
+    runtime: node
+    region: frankfurt # Europe region for better latency
+    plan: free
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
+    healthCheckPath: /health
+    
+    # Environment Variables (configure these in Render Dashboard)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000  # Render's default port
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_FORMAT
+        value: json
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000  # 15 minutes
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 300     # Higher for webhook processing
+      
+      # File processing limits for free tier
+      - key: MAX_FILE_SIZE
+        value: 10485760  # 10MB
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: XLS_OUTPUT_DIR
+        value: /tmp/reports
+      - key: TEMP_DIR
+        value: /tmp/processing
+      
+      # AI processing optimization
+      - key: AI_PROCESSING_TIMEOUT
+        value: 25000     # Reduced for free tier
+      - key: MAX_PROCESSING_RETRIES
+        value: 2         # Reduced retries for cost control
+      
+      # Telegram settings
+      - key: TELEGRAM_POLLING_TIMEOUT
+        value: 8000      # Reduced for free tier
+      - key: TELEGRAM_MAX_CONNECTIONS
+        value: 50        # Reduced connections
+      
+      # Production webhook optimization
+      - key: WEBHOOK_BASE_URL
+        value: https://leo-orders-api.onrender.com  # Update with your actual URL
+      - key: KEEP_ALIVE_TIMEOUT
+        value: 25000     # Optimized for Render
+      - key: HEADERS_TIMEOUT
+        value: 30000
+      
+      # Free tier specific settings
+      - key: RENDER_FREE_TIER
+        value: true
+      - key: MEMORY_LIMIT_MB
+        value: 512
+      - key: CPU_LIMIT
+        value: 0.1
+      
+      # === SENSITIVE KEYS (Set in Render Dashboard) ===
+      # AI APIs
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+        
+      # Database
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+        
+      # Bot & Auth
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: WEBHOOK_SECRET
+        sync: false
+      
+      # Business specific
+      - key: LEOS_FOODS_CIF
+        sync: false
+      - key: AUTO_EXPORT_XLS
+        value: true
+
+# Deployment configuration
+autoDeploy: true
+branch: main
+repo: https://github.com/your-username/order-processing  # Update with your repo URL
+
+# Health check settings optimized for Render Free Tier
+healthCheckPath: /health
+healthCheckInterval: 90   # Every 90 seconds (free tier friendly)
+healthCheckTimeout: 15    # 15 second timeout
+healthCheckThreshold: 4   # 4 failed checks before restart (more lenient)
+
+# Build optimization for free tier
+buildTimeout: 10  # 10 minute build timeout

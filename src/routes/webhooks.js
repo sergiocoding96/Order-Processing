@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
+import SecurityUtils from '../utils/security.js';
 import { ContentDetector } from '../services/content-detector.js';
 import { Validators } from '../utils/validators.js';
 import { processingQueue } from '../services/processing-queue.js';
@@ -12,6 +13,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// SECURITY FIX: Rate limiting for webhook endpoints
+const mailhookRateLimit = SecurityUtils.createRateLimit(60000, 50); // 50 requests per minute
+const telegramRateLimit = SecurityUtils.createRateLimit(60000, 100); // 100 requests per minute
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -35,15 +40,23 @@ const upload = multer({
     files: 5 // Maximum 5 files
   },
   fileFilter: (req, file, cb) => {
-    // Allow PDFs, images, and text files
-    const allowedTypes = /pdf|jpeg|jpg|png|gif|txt|doc|docx|xls|xlsx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    // SECURITY FIX: Enhanced file validation with security checks
+    try {
+      const validatedFile = SecurityUtils.validateFileUpload(file);
+      
+      // Additional MIME type validation
+      const allowedTypes = /pdf|jpeg|jpg|png|gif|txt|doc|docx|xls|xlsx/;
+      const extname = allowedTypes.test(path.extname(validatedFile.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(validatedFile.mimetype);
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only PDF, image, and document files are allowed!'));
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        cb(new Error('File type not allowed after security validation'));
+      }
+    } catch (error) {
+      logger.error('File upload security validation failed', error);
+      cb(new Error(`Security validation failed: ${error.message}`));
     }
   }
 });
@@ -53,6 +66,9 @@ router.post('/webhook/mailhook', upload.array('attachments', 5), async (req, res
   let uploadedFiles = [];
   
   try {
+    // SECURITY FIX: Apply rate limiting
+    const clientId = req.ip || 'unknown';
+    mailhookRateLimit(clientId);
     logger.info('Mailhook received', {
       hasBody: !!req.body,
       fileCount: req.files?.length || 0,
@@ -60,12 +76,27 @@ router.post('/webhook/mailhook', upload.array('attachments', 5), async (req, res
       subject: req.body.subject
     });
 
-    // Validate uploaded files
+    // SECURITY FIX: Enhanced file validation with security checks
     uploadedFiles = req.files || [];
     if (uploadedFiles.length > 0) {
+      // Apply security validation first
+      try {
+        uploadedFiles = uploadedFiles.map(file => SecurityUtils.validateFileUpload(file));
+      } catch (securityError) {
+        logger.error('File security validation failed', securityError);
+        await Validators.cleanupFiles(uploadedFiles);
+        return res.status(400).json({
+          success: false,
+          error: 'File security validation failed',
+          message: securityError.message
+        });
+      }
+      
+      // Then apply standard validation
       const fileValidation = Validators.validateFiles(uploadedFiles);
       if (!fileValidation.valid) {
         logger.error('File validation failed', fileValidation.error);
+        await Validators.cleanupFiles(uploadedFiles);
         return res.status(400).json({
           success: false,
           error: 'Invalid files',
@@ -74,18 +105,18 @@ router.post('/webhook/mailhook', upload.array('attachments', 5), async (req, res
       }
     }
 
-    // Create simple email data structure
+    // SECURITY FIX: Sanitize email data and limit size
     const emailData = {
       timestamp: new Date().toISOString(),
       source: 'mailhook',
-      messageId: req.body.messageId || req.body.id || `email-${Date.now()}`,
-      from: req.body.from || req.body.sender || 'unknown@example.com',
-      to: req.body.to || req.body.recipient || '',
-      subject: req.body.subject || 'No Subject',
-      body: req.body.body || req.body.text || req.body.content || '',
+      messageId: SecurityUtils.sanitizeSQLParam(req.body.messageId || req.body.id || `email-${Date.now()}`),
+      from: SecurityUtils.sanitizeSQLParam(req.body.from || req.body.sender || 'unknown@example.com'),
+      to: SecurityUtils.sanitizeSQLParam(req.body.to || req.body.recipient || ''),
+      subject: SecurityUtils.truncateString(req.body.subject || 'No Subject', 200),
+      body: SecurityUtils.truncateString(req.body.body || req.body.text || req.body.content || '', 10000),
       attachments: uploadedFiles,
       metadata: {
-        originalData: req.body,
+        originalDataSize: JSON.stringify(req.body).length,
         receivedAt: new Date().toISOString()
       }
     };
@@ -148,15 +179,19 @@ router.post('/webhook/mailhook', upload.array('attachments', 5), async (req, res
   } catch (error) {
     logger.error('Mailhook processing failed', error);
     
-    // Cleanup uploaded files on error
-    if (uploadedFiles.length > 0) {
-      await Validators.cleanupFiles(uploadedFiles);
+    // SECURITY FIX: Always cleanup uploaded files on error
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      try {
+        await Validators.cleanupFiles(uploadedFiles);
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup files after error', cleanupError);
+      }
     }
     
     res.status(500).json({
       success: false,
       error: 'Email processing failed',
-      message: error.message
+      message: SecurityUtils.truncateString(error.message, 200)
     });
   }
 });
@@ -164,6 +199,9 @@ router.post('/webhook/mailhook', upload.array('attachments', 5), async (req, res
 // Telegram Webhook Endpoint
 router.post('/webhook/telegram', async (req, res) => {
   try {
+    // SECURITY FIX: Apply rate limiting
+    const clientId = req.ip || 'unknown';
+    telegramRateLimit(clientId);
     const update = req.body;
     
     logger.info('Telegram webhook received', {

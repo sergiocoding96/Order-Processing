@@ -1,1 +1,90 @@
-[]
+[
+  {
+    "id": "1754942344259o0tixhfzl",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Tomate",
+    "cantidad": 2,
+    "precio_unitario": 3,
+    "precio_total": 6,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:04.259Z"
+  },
+  {
+    "id": "1754942344259azuzd5q35",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Pepino",
+    "cantidad": 1,
+    "precio_unitario": 2,
+    "precio_total": 2,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:04.259Z"
+  },
+  {
+    "id": "1754942344259njx09yzan",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Zanahoria",
+    "cantidad": 4,
+    "precio_unitario": 1.5,
+    "precio_total": 6,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:04.259Z"
+  },
+  {
+    "id": "1754942389613ztfglrmjt",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Tomate",
+    "cantidad": 2,
+    "precio_unitario": 3,
+    "precio_total": 6,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:49.613Z"
+  },
+  {
+    "id": "1754942389613gkzhu2i2r",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Pepino",
+    "cantidad": 1,
+    "precio_unitario": 2,
+    "precio_total": 2,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:49.613Z"
+  },
+  {
+    "id": "1754942389613wjduj3wsy",
+    "pedido_id": "1754942344244hbcly81yw",
+    "nombre": "Zanahoria",
+    "cantidad": 4,
+    "precio_unitario": 1.5,
+    "precio_total": 6,
+    "unidad": "kg",
+    "observaciones": "",
+    "created_at": "2025-08-11T19:59:49.613Z"
+  },
+  {
+    "id": "17549506827057i2kn0p3z",
+    "pedido_id": "175495068269133kp6ovzq",
+    "nombre": "ACEITE DE OLIVA VIRGEN EXTRA",
+    "cantidad": 5,
+    "precio_unitario": 12.5,
+    "precio_total": 62.5,
+    "unidad": "Litro",
+    "observaciones": "",
+    "created_at": "2025-08-11T22:18:02.705Z"
+  },
+  {
+    "id": "17549506827054myxgfg26",
+    "pedido_id": "175495068269133kp6ovzq",
+    "nombre": "PASTA ITALIANA",
+    "cantidad": 20,
+    "precio_unitario": 4.25,
+    "precio_total": 85,
+    "unidad": "Paquete",
+    "observaciones": "",
+    "created_at": "2025-08-11T22:18:02.705Z"
+  }
+]

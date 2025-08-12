@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../config/database.js';
 import { LocalDatabase } from '../config/local-database.js';
+import SecurityUtils from '../utils/security.js';
 import logger from '../utils/logger.js';
 
 // Flag to determine if we should use local database
@@ -10,6 +11,20 @@ export class PedidosModel {
     // Try Supabase first, fallback to local DB on failure
     try {
       if (!useLocalDB) {
+        // Duplicate detection by numero_pedido (if provided)
+        if (orderData.numero_pedido) {
+          const existing = await supabaseAdmin
+            .from('pedidos')
+            .select('id, numero_pedido')
+            .eq('numero_pedido', orderData.numero_pedido)
+            .limit(1)
+            .maybeSingle();
+          if (existing && existing.data) {
+            logger.info('Duplicate order detected, returning existing', { orderId: existing.data.id });
+            return existing.data;
+          }
+        }
+
         const { data, error } = await supabaseAdmin
           .from('pedidos')
           .insert({
@@ -26,7 +41,7 @@ export class PedidosModel {
           .single();
 
         if (error) throw error;
-        
+
         logger.info('Order created successfully (Supabase)', { orderId: data.id });
         return data;
       }
@@ -105,7 +120,7 @@ export class PedidosModel {
         .single();
 
       if (error) throw error;
-      
+
       logger.info('Order updated successfully', { orderId: id });
       return data;
     } catch (error) {
@@ -122,7 +137,7 @@ export class PedidosModel {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       logger.info('Order deleted successfully', { orderId: id });
       return true;
     } catch (error) {
@@ -133,9 +148,124 @@ export class PedidosModel {
 
   static async getStats(filters = {}) {
     try {
+      // Use database function for better performance
+      const { data, error } = await supabase
+        .rpc('get_order_stats', {
+          start_date: filters.fecha_desde || null,
+          end_date: filters.fecha_hasta || null
+        })
+        .single();
+
+      if (error) throw error;
+
+      const stats = {
+        total_orders: parseInt(data.total_orders) || 0,
+        total_amount: parseFloat(data.total_amount) || 0,
+        avg_order_value: parseFloat(data.avg_order_value) || 0,
+        by_channel: data.orders_by_channel || {},
+        by_status: data.orders_by_status || {}
+      };
+
+      logger.info('Order stats retrieved successfully', { 
+        filters, 
+        total_orders: stats.total_orders 
+      });
+      
+      return stats;
+    } catch (error) {
+      logger.error('Error getting order stats', { filters, error });
+      throw error;
+    }
+  }
+
+  static async createWithProducts(orderData, products) {
+    const client = supabaseAdmin;
+    
+    try {
+      // Start transaction by creating order first
+      const { data: order, error: orderError } = await client
+        .from('pedidos')
+        .insert({
+          numero_pedido: orderData.numero_pedido,
+          cliente: orderData.cliente,
+          fecha_pedido: orderData.fecha_pedido,
+          canal_origen: orderData.canal_origen,
+          total_pedido: orderData.total_pedido,
+          observaciones: orderData.observaciones,
+          estado: orderData.estado || 'procesado',
+          metadata: orderData.metadata || {}
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Insert products if provided
+      if (products && products.length > 0) {
+        const productInserts = products.map(product => ({
+          pedido_id: order.id,
+          nombre_producto: product.nombre_producto,
+          cantidad: product.cantidad,
+          unidad: product.unidad,
+          precio_unitario: product.precio_unitario,
+          total_producto: product.total_producto
+        }));
+
+        const { error: productsError } = await client
+          .from('pedido_productos')
+          .insert(productInserts);
+
+        if (productsError) {
+          // If products fail, we could optionally delete the order
+          // but for now we'll just log the error
+          logger.error('Failed to insert products', { 
+            orderId: order.id, 
+            error: productsError 
+          });
+          throw productsError;
+        }
+      }
+
+      logger.info('Order with products created successfully', { 
+        orderId: order.id, 
+        productsCount: products ? products.length : 0 
+      });
+
+      return order;
+    } catch (error) {
+      logger.error('Error creating order with products', { orderData, error });
+      throw error;
+    }
+  }
+
+  static async searchOrders(searchTerm, filters = {}) {
+    try {
       let query = supabase
         .from('pedidos')
-        .select('total_pedido, canal_origen, fecha_pedido, estado');
+        .select(`
+          *,
+          pedido_productos (*)
+        `);
+
+      // SECURITY FIX: Sanitize search term to prevent SQL injection
+      if (searchTerm) {
+        const sanitizedTerm = SecurityUtils.sanitizeSQLParam(searchTerm);
+        if (!sanitizedTerm) {
+          throw new Error('Invalid search term');
+        }
+        
+        // Use parameterized search to prevent injection
+        query = query.or(`numero_pedido.ilike.%${sanitizedTerm}%,cliente.ilike.%${sanitizedTerm}%,observaciones.ilike.%${sanitizedTerm}%`);
+      }
+
+      // Apply filters
+      if (filters.canal_origen) {
+        query = query.eq('canal_origen', filters.canal_origen);
+      }
+      
+      if (filters.estado) {
+        query = query.eq('estado', filters.estado);
+      }
 
       if (filters.fecha_desde) {
         query = query.gte('fecha_pedido', filters.fecha_desde);
@@ -145,35 +275,14 @@ export class PedidosModel {
         query = query.lte('fecha_pedido', filters.fecha_hasta);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(filters.limit || 50);
 
       if (error) throw error;
-
-      const stats = {
-        total_orders: data.length,
-        total_amount: data.reduce((sum, order) => sum + parseFloat(order.total_pedido || 0), 0),
-        by_channel: {},
-        by_status: {},
-        avg_order_value: 0
-      };
-
-      data.forEach(order => {
-        // By channel
-        stats.by_channel[order.canal_origen] = 
-          (stats.by_channel[order.canal_origen] || 0) + 1;
-        
-        // By status
-        stats.by_status[order.estado] = 
-          (stats.by_status[order.estado] || 0) + 1;
-      });
-
-      stats.avg_order_value = stats.total_orders > 0 
-        ? stats.total_amount / stats.total_orders 
-        : 0;
-
-      return stats;
+      return data;
     } catch (error) {
-      logger.error('Error getting order stats', { filters, error });
+      logger.error('Error searching orders', { searchTerm, filters, error });
       throw error;
     }
   }

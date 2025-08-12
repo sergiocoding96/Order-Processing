@@ -3,14 +3,16 @@ import path from 'path';
 import pdfParse from 'pdf-parse';
 import pdf2pic from 'pdf2pic';
 import { analyzeVisualContent, processTextWithFallback } from '../config/ai.js';
+import { DocumentClassifier } from '../ai/classifier.js';
+import XLSExporter from '../export/xlsExporter.js';
 import logger from '../utils/logger.js';
 
 export class PDFProcessor {
-  
+
   /**
    * Process PDF file using streamlined approach:
    * Step 1: PDF → Image conversion (pdf2pic)
-   * Step 2: GPT-4 Vision for visual processing and initial extraction
+   * Step 2: GPT-5 Vision for visual processing and initial extraction
    * Step 3: DeepSeek R1 for reasoning, validation, and final structuring
    */
   static async processPDF(filePath, options = {}) {
@@ -23,14 +25,23 @@ export class PDFProcessor {
         throw new Error(`PDF to image conversion failed: ${imageConversion.error}`);
       }
 
-      // Step 2: Use GPT-4 Vision for initial visual analysis
+      // Step 2: Use GPT-5 Vision for initial visual analysis
       const visionResult = await this.processWithVision(imageConversion.images, options);
       if (!visionResult.success) {
-        throw new Error(`GPT-4 Vision processing failed: ${visionResult.error}`);
+        throw new Error(`GPT-5 Vision processing failed: ${visionResult.error}`);
       }
 
-      // Step 3: Use reasoning chain (Gemini → DeepSeek → Claude) for final structuring
+      // Step 3: Use reasoning chain (Gemini → GPT-4o-mini fallback) for final structuring
       const finalResult = await this.finalizeWithReasoning(visionResult.rawResponse, options);
+
+      // Classify document type
+      const classification = DocumentClassifier.classify(visionResult.rawResponse);
+      finalResult.extractedData.tipo = classification.type;
+
+      // Generate XLS export (non-blocking optional step)
+      if (options?.generateXLS || process.env.AUTO_EXPORT_XLS === 'true') {
+        await XLSExporter.generateFromStructuredData(finalResult.extractedData, 'Test Files Leo Output');
+      }
 
       return {
         success: true,
@@ -40,7 +51,8 @@ export class PDFProcessor {
         processingSteps: {
           imageConversion: imageConversion.pageCount,
           visionAnalysis: visionResult.confidence,
-          reasoningValidation: finalResult.confidence
+          reasoningValidation: finalResult.confidence,
+          classification: classification.type
         }
       };
 
@@ -56,15 +68,15 @@ export class PDFProcessor {
   static async extractTextFromPDF(filePath) {
     try {
       logger.info('Attempting PDF text extraction', { filePath });
-      
+
       const dataBuffer = fs.readFileSync(filePath);
       const pdfData = await pdfParse(dataBuffer);
-      
-      logger.info('PDF text extraction successful', { 
+
+      logger.info('PDF text extraction successful', {
         textLength: pdfData.text.length,
-        pageCount: pdfData.numpages 
+        pageCount: pdfData.numpages
       });
-      
+
       return {
         success: true,
         text: pdfData.text,
@@ -104,11 +116,11 @@ export class PDFProcessor {
 
       // Convert first page only for performance
       const result = await convert(1); // Convert page 1
-      
+
       if (!result) {
         throw new Error('No image generated from PDF');
       }
-      
+
       const results = [result]; // Wrap single result in array for compatibility
 
       // Read the generated images as base64
@@ -147,11 +159,11 @@ export class PDFProcessor {
   }
 
   /**
-   * Process images with GPT-4 Vision for initial extraction
+   * Process images with GPT-5 Vision for initial extraction
    */
   static async processWithVision(images, options = {}) {
     try {
-      logger.info('Processing images with GPT-4 Vision', { imageCount: images.length });
+      logger.info('Processing images with GPT-5 Vision', { imageCount: images.length });
 
       // For now, process first page (can be extended for multi-page)
       const firstImage = images[0];
@@ -223,7 +235,7 @@ OUTPUT FORMAT: First identify Leo as the supplier/seller, then find the actual C
       };
 
     } catch (error) {
-      logger.error('GPT-4 Vision processing failed', error);
+      logger.error('Vision processing failed', error);
       throw error;
     }
   }
@@ -233,9 +245,9 @@ OUTPUT FORMAT: First identify Leo as the supplier/seller, then find the actual C
    */
   static async finalizeWithReasoning(visionAnalysis, options = {}) {
     try {
-      logger.info('Using DeepSeek R1 for final reasoning and structuring');
+      logger.info('Using Gemini for final reasoning and structuring (fallback: GPT-4o-mini)');
 
-      const reasoningPrompt = `Based on the following GPT-4 Vision analysis of a Spanish order PDF, extract and structure the order information into a precise JSON format.
+      const reasoningPrompt = `Based on the following Vision analysis of a Spanish document image (invoice or order), extract and structure the information into a precise JSON format.
 
 Vision Analysis:
 ${visionAnalysis}
@@ -275,17 +287,17 @@ Rules:
       // Try reasoning with fallback chain, handling JSON parsing at each step
       let extractedData;
       let result;
-      
+
       try {
         result = await processTextWithFallback(reasoningPrompt, {
           maxTokens: 4000,
           temperature: 0.1,
           responseFormat: { type: 'json_object' }
         });
-        
+
         // Try to parse JSON from the successful provider
         extractedData = this.parseJSONFromProvider(result);
-        
+
       } catch (chainError) {
         logger.error('All reasoning providers failed', chainError);
         throw new Error(`Reasoning chain failed: ${chainError.message}`);
@@ -314,7 +326,7 @@ Rules:
   static parseJSONFromProvider(result) {
     try {
       let jsonContent = result.content;
-      
+
       // Handle different provider response formats
       if (result.provider === 'deepseek') {
         // DeepSeek R1 includes reasoning text, extract JSON from response
@@ -327,69 +339,69 @@ Rules:
         if (!result.content || result.content.trim().length === 0) {
           throw new Error('GEMINI_EMPTY_RESPONSE');
         }
-        
+
         // Check for truncated JSON response
         if (result.content.includes('"nombre_') && !result.content.trim().endsWith('}')) {
           logger.warn('Detected truncated Gemini response, attempting JSON repair');
-          
+
           const openBraces = (result.content.match(/\{/g) || []).length;
           const closeBraces = (result.content.match(/\}/g) || []).length;
-          
+
           if (openBraces > closeBraces) {
             // Try to close the JSON structure
             let repairAttempt = result.content;
             repairAttempt = repairAttempt.replace(/,\s*{\s*"nombre_[^}]*$/, '');
             repairAttempt += '\n  ],\n  "total_pedido": null,\n  "observaciones": "Data truncated - partial extraction"\n}';
-            
+
             const parsed = JSON.parse(repairAttempt);
             logger.info('Successfully repaired truncated JSON from Gemini');
             return parsed;
           }
         }
-        
+
         // Normal Gemini parsing
-        const jsonMatch = result.content.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-                         result.content.match(/(\{[\s\S]*\})/);
+        const jsonMatch = result.content.match(/```json\s*(\{[\s\S]*?\})\s*```/) ||
+          result.content.match(/(\{[\s\S]*\})/);
         if (jsonMatch) {
           jsonContent = jsonMatch[1] || jsonMatch[0];
         }
         jsonContent = jsonContent.replace(/```json|```/g, '').trim();
-        
+
       } else if (result.provider === 'claude') {
         // Claude may wrap JSON, extract it
-        const jsonMatch = result.content.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
-                         result.content.match(/(\{[\s\S]*\})/);
+        const jsonMatch = result.content.match(/```json\s*(\{[\s\S]*?\})\s*```/) ||
+          result.content.match(/(\{[\s\S]*\})/);
         if (jsonMatch) {
           jsonContent = jsonMatch[1] || jsonMatch[0];
         }
       }
-      
+
       // Clean up any remaining whitespace or formatting
       jsonContent = jsonContent.trim();
-      
+
       const parsed = JSON.parse(jsonContent);
-      
+
       logger.info('Successfully parsed JSON from reasoning response', {
         provider: result.provider,
         extractedFields: Object.keys(parsed)
       });
-      
+
       return parsed;
-      
+
     } catch (parseError) {
       logger.warn('JSON parsing failed for provider', {
         provider: result.provider,
         error: parseError.message,
         contentPreview: result.content.substring(0, 200) + '...'
       });
-      
+
       // If this is a Gemini error that should trigger fallback
-      if (result.provider === 'gemini' && 
-          (parseError.message === 'GEMINI_EMPTY_RESPONSE' || 
-           parseError.message.includes('Unexpected end'))) {
+      if (result.provider === 'gemini' &&
+        (parseError.message === 'GEMINI_EMPTY_RESPONSE' ||
+          parseError.message.includes('Unexpected end'))) {
         throw new Error('GEMINI_PARSING_FAILED');
       }
-      
+
       // For other providers or non-recoverable errors
       throw new Error(`JSON parsing failed for ${result.provider}: ${parseError.message}`);
     }
@@ -405,7 +417,7 @@ Rules:
           fs.unlinkSync(image.path);
         }
       });
-      
+
       // Remove temp directory if empty
       const tempDir = path.dirname(images[0]?.path);
       if (tempDir && fs.existsSync(tempDir)) {
@@ -424,23 +436,23 @@ Rules:
    */
   static calculateProcessingConfidence(extractedData) {
     let score = 0.0;
-    
+
     // Check if we have products (most important)
     if (extractedData.productos && extractedData.productos.length > 0) {
       score += 0.5;
-      
+
       // Check product completeness
-      const completeProducts = extractedData.productos.filter(p => 
+      const completeProducts = extractedData.productos.filter(p =>
         p.nombre_producto && p.cantidad && p.precio_unitario
       );
       score += (completeProducts.length / extractedData.productos.length) * 0.3;
     }
-    
+
     // Check if we have total
     if (extractedData.total_pedido && extractedData.total_pedido > 0) {
       score += 0.1;
     }
-    
+
     // Check if we have order metadata
     if (extractedData.numero_pedido || extractedData.cliente || extractedData.fecha_pedido) {
       score += 0.1;
@@ -455,7 +467,7 @@ Rules:
   static async analyzePDFType(filePath) {
     try {
       const textResult = await this.extractTextFromPDF(filePath);
-      
+
       if (!textResult.success) {
         return { type: 'image-based', confidence: 0.9 };
       }
@@ -470,7 +482,7 @@ Rules:
 
       // Check for meaningful content patterns
       const hasOrderPatterns = /precio|total|cantidad|pedido|order|€|\$/i.test(textResult.text);
-      
+
       if (hasOrderPatterns) {
         return { type: 'text-based', confidence: 0.9 };
       }
@@ -511,10 +523,10 @@ Rules:
     };
 
     const lines = text.split('\n');
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       // Look for product lines (Spanish format)
       const productMatch = line.match(/([A-ZÁÉÍÓÚÑ\s]+)\s+(Kilogramo|Litro|Unidad|Pieza)\s+(\d+(?:,\d+)?)\s+(\d+,\d+)\s*€/i);
       if (productMatch) {

@@ -33,5 +33,31 @@
     },
     "created_at": "2025-08-05T22:06:25.753Z",
     "updated_at": "2025-08-05T22:06:25.753Z"
+  },
+  {
+    "id": "1754942344244hbcly81yw",
+    "numero_pedido": "DUP-1",
+    "cliente": "Test",
+    "fecha_pedido": "2025-08-12",
+    "canal_origen": "telegram",
+    "total_pedido": 10,
+    "observaciones": "ok",
+    "estado": "procesado",
+    "metadata": {},
+    "created_at": "2025-08-11T19:59:04.244Z",
+    "updated_at": "2025-08-11T19:59:04.246Z"
+  },
+  {
+    "id": "175495068269133kp6ovzq",
+    "numero_pedido": "TEST-1754950682126",
+    "cliente": "Cliente de Prueba Sistema",
+    "fecha_pedido": "2025-01-11",
+    "canal_origen": "telegram",
+    "total_pedido": 150.75,
+    "observaciones": "Pedido de prueba del sistema completo",
+    "estado": "procesado",
+    "metadata": {},
+    "created_at": "2025-08-11T22:18:02.691Z",
+    "updated_at": "2025-08-11T22:18:02.691Z"
   }
 ]

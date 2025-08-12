@@ -3,13 +3,13 @@ import { analyzeVisualContent } from '../config/ai.js';
 import logger from '../utils/logger.js';
 
 export class WebScraper {
-  
+
   /**
    * Scrape content from URL and extract order data
    */
   static async scrapeURL(url, options = {}) {
     let browser = null;
-    
+
     try {
       logger.info('Starting web scraping', { url });
 
@@ -25,17 +25,17 @@ export class WebScraper {
       });
 
       const page = await browser.newPage();
-      
+
       // Set user agent to avoid bot detection
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      
+
       // Set viewport
       await page.setViewport({ width: 1280, height: 720 });
 
       // Navigate to URL with timeout
-      await page.goto(url, { 
-        waitUntil: 'networkidle2', 
-        timeout: options.timeout || 30000 
+      await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: options.timeout || 30000
       });
 
       // Wait for content to load
@@ -43,7 +43,7 @@ export class WebScraper {
 
       // Determine scraping strategy based on URL
       const strategy = this.determineScrapingStrategy(url);
-      
+
       let result;
       switch (strategy.type) {
         case 'ecommerce':
@@ -60,20 +60,20 @@ export class WebScraper {
       }
 
       await browser.close();
-      
-      logger.info('Web scraping completed', { 
-        url, 
+
+      logger.info('Web scraping completed', {
+        url,
         strategy: strategy.type,
-        success: result.success 
+        success: result.success
       });
-      
+
       return result;
 
     } catch (error) {
       if (browser) {
         await browser.close();
       }
-      
+
       logger.error('Web scraping failed', { url, error });
       throw error;
     }
@@ -137,7 +137,7 @@ export class WebScraper {
       };
 
       // Take screenshot for visual analysis
-      const screenshot = await page.screenshot({ 
+      const screenshot = await page.screenshot({
         encoding: 'base64',
         fullPage: true
       });
@@ -147,7 +147,7 @@ export class WebScraper {
         // Remove script and style elements
         const scripts = document.querySelectorAll('script, style');
         scripts.forEach(el => el.remove());
-        
+
         return document.body.innerText;
       });
 
@@ -207,9 +207,9 @@ export class WebScraper {
     try {
       // Navigate to image
       await page.goto(url);
-      
+
       // Take screenshot or get image buffer
-      const screenshot = await page.screenshot({ 
+      const screenshot = await page.screenshot({
         encoding: 'base64',
         fullPage: true
       });
@@ -237,7 +237,7 @@ export class WebScraper {
   static async scrapeGeneralPage(page, url) {
     try {
       // Take screenshot for visual analysis
-      const screenshot = await page.screenshot({ 
+      const screenshot = await page.screenshot({
         encoding: 'base64',
         fullPage: true
       });
@@ -247,7 +247,7 @@ export class WebScraper {
         // Remove script and style elements
         const scripts = document.querySelectorAll('script, style, nav, header, footer');
         scripts.forEach(el => el.remove());
-        
+
         return document.body.innerText;
       });
 
@@ -334,7 +334,7 @@ export class WebScraper {
         throw new Error('Scraping failed: ' + scrapedResult.error);
       }
 
-      // If we have a screenshot, use GPT-4 Vision
+      // If we have a screenshot, use GPT-5 Vision
       if (scrapedResult.screenshot) {
         const prompt = `Analyze this webpage screenshot and extract any order information you can find.
 
@@ -367,7 +367,7 @@ Return the information in JSON format:
         const visionResult = await analyzeVisualContent(
           scrapedResult.screenshot,
           prompt,
-          { maxTokens: 2000, temperature: 0.1 }
+          { model: 'gpt-4o', maxTokens: 2000, temperature: 0.1 }
         );
 
         return {
@@ -432,7 +432,7 @@ Return the information in JSON format:
   static validateURL(url) {
     try {
       const urlObj = new URL(url);
-      
+
       // Only allow HTTP/HTTPS
       if (!['http:', 'https:'].includes(urlObj.protocol)) {
         return { valid: false, error: 'Only HTTP/HTTPS URLs allowed' };
